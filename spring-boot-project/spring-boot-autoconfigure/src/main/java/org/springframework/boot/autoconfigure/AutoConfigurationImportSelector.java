@@ -112,12 +112,24 @@ public class AutoConfigurationImportSelector implements DeferredImportSelector, 
 		if (!isEnabled(annotationMetadata)) {
 			return EMPTY_ENTRY;
 		}
+		//获取@EnableAutoConfiguration注解属性
 		AnnotationAttributes attributes = getAttributes(annotationMetadata);
+
+		//从当前classPath下面获取所有META-INF下spring.factories中EnableAutoConfiguration所对应的value
 		List<String> configurations = getCandidateConfigurations(annotationMetadata, attributes);
 		configurations = removeDuplicates(configurations);
 		Set<String> exclusions = getExclusions(annotationMetadata, attributes);
 		checkExcludedClasses(configurations, exclusions);
 		configurations.removeAll(exclusions);
+
+		/**
+		 * 过滤掉当前环境所不需要装配类：
+		 * 1、从spring.factories获取org.springframework.boot.autoconfigure.AutoConfigurationImportFilter所对应的value,分别为OnBeanCondition、OnClassCondition、OnWebApplicationCondition
+		 *
+		 * 2、从spring-autoconfigure-metadata.properties获取装配类所需要的依赖（key:装配类+ConditionalOnBean、装配类+ConditionalOnClass等，根据key获取value）
+		 *
+		 * 3、检测装配类所需要的依赖是否存在：如果不存在，则可以排除
+		 */
 		configurations = filter(configurations, autoConfigurationMetadata);
 		fireAutoConfigurationImportEvents(configurations, exclusions);
 		return new AutoConfigurationEntry(configurations, exclusions);
@@ -392,6 +404,12 @@ public class AutoConfigurationImportSelector implements DeferredImportSelector, 
 					() -> String.format("Only %s implementations are supported, got %s",
 							AutoConfigurationImportSelector.class.getSimpleName(),
 							deferredImportSelector.getClass().getName()));
+			/**
+			 * getAutoConfigurationMetadata：
+			 * 加载META-INF/spring-autoconfigure-metadata.properties中的元素，找到自动装配类注入容器所需要依赖的类；
+			 *
+			 *
+			 */
 			AutoConfigurationEntry autoConfigurationEntry = ((AutoConfigurationImportSelector) deferredImportSelector)
 					.getAutoConfigurationEntry(getAutoConfigurationMetadata(), annotationMetadata);
 			this.autoConfigurationEntries.add(autoConfigurationEntry);
